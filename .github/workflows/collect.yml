@@ -7,10 +7,6 @@ on:
     - cron: '17 8-18 * * 0-4'
   workflow_dispatch:
     inputs:
-      only:
-        description: 'Run only one source (madinty or nuca), or leave empty for both'
-        required: false
-        default: ''
       summary:
         description: 'Send the daily Telegram summary now (1 = yes)'
         required: false
@@ -23,22 +19,52 @@ concurrency:
   group: collect
   cancel-in-progress: false
 
+env:
+  TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  PAGE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+
 jobs:
-  collect:
+  # Madinty: runs on GitHub's servers (Madinty accepts them).
+  madinty:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - name: Collect
+      - name: Collect Madinty
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          PAGE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
-          ONLY: ${{ github.event.inputs.only }}
+          ONLY: madinty
+        run: node collect.mjs
+      - name: Save data
+        if: always()
+        run: |
+          git config user.name "plot-collector"
+          git config user.email "plot-collector@users.noreply.github.com"
+          git add data
+          git diff --cached --quiet || (git commit -m "madinty $(TZ=Asia/Riyadh date +%Y-%m-%dT%H:%M)" && git pull --rebase && git push)
+
+  # NUCA blocks foreign/data-centre addresses, so this job runs on Mohamed's Mac
+  # (self-hosted runner). If the Mac is off it waits; only the newest run is kept.
+  nuca:
+    needs: madinty
+    if: always()
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Collect NUCA
+        env:
+          ONLY: nuca
           SUMMARY: ${{ github.event.inputs.summary }}
         run: node collect.mjs
       - name: Save data
@@ -47,4 +73,4 @@ jobs:
           git config user.name "plot-collector"
           git config user.email "plot-collector@users.noreply.github.com"
           git add data
-          git diff --cached --quiet || (git commit -m "data $(TZ=Asia/Riyadh date +%Y-%m-%dT%H:%M)" && git push)
+          git diff --cached --quiet || (git commit -m "nuca $(TZ=Asia/Riyadh date +%Y-%m-%dT%H:%M)" && git pull --rebase && git push)
