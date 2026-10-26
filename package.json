@@ -1,0 +1,7 @@
+{
+  "name": "beit-al-watan-watch",
+  "private": true,
+  "type": "module",
+  "scripts": { "collect": "node collect.mjs" },
+  "dependencies": { "jsdom": "24.1.3" }
+}
