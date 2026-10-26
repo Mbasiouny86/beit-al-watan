@@ -34,7 +34,10 @@ async function req(url, opt = {}, tries = 4) {
       for (const c of r.headers.getSetCookie?.() || []) { const kv = c.split(';')[0], j = kv.indexOf('='); if (j > 0) jar.set(kv.slice(0, j).trim(), kv.slice(j + 1)) }
       if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + url);
       return r;
-    } catch (e) { if (i >= tries) throw e; log('retry', i, String(e.message || e).slice(0, 120)); await sleep(3000 * i) }
+    } catch (e) {
+      const why = [e.message, e.cause?.code, e.cause?.message].filter(Boolean).join(' / ');
+      if (i >= tries) throw new Error(why); log('retry', i, url, why.slice(0, 200)); await sleep(3000 * i)
+    }
   }
 }
 const parse = html => new JSDOM(html).window.document;
