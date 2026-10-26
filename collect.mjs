@@ -249,7 +249,7 @@ async function main() {
   await writeJson('data/status.json', status);
 
   // Notifications
-  const hr = jNow().getUTCHours(), evening = FORCE_SUMMARY || (hr >= 20 && state.summaryDate !== jDate());
+  const hr = jNow().getUTCHours(), evening = ONLY !== 'madinty' && (FORCE_SUMMARY || (hr >= 20 && state.summaryDate !== jDate()));
   const lines = [];
   if (alerts.length) lines.push('⚠️ ' + alerts.join('\n⚠️ '));
   if (errors.length) lines.push('❌ Run problem: ' + errors.join(' | '));
@@ -264,6 +264,6 @@ async function main() {
   if (lines.length) await telegram('Beit Al Watan\n' + lines.join('\n') + (process.env.PAGE_URL ? '\n' + process.env.PAGE_URL : ''));
   await writeJson('data/state.json', state);
   log('done', JSON.stringify({ served, free, errors }));
-  if (errors.length === (ONLY ? 1 : 3)) process.exitCode = 1;   // everything failed
+  if (errors.length >= (ONLY === 'nuca' ? 2 : ONLY ? 1 : 3)) process.exitCode = 1;   // everything failed
 }
 main().catch(e => { console.error(e); process.exit(1) });
