@@ -50,13 +50,14 @@ async function madinty(prev, prevPlots) {
   const TODAY = jDate(), WK = jDate(-13);
   const zl = await api('land-zones?per_page=200');
   log('madinty zones', zl.length);
-  const agg = {}, days = {}; let page = 1, last = 1, stop = false, stats = null;
+  const agg = {}, days = {}, daysCity = {}; let page = 1, last = 1, stop = false, stats = null;
   do {
     const d = await api('land-plots/live-reserved?per_page=100&page=' + page);
     last = d.pagination?.last_page || 1; stats = d.stats || stats;
     for (const p of d.plots || []) {
       if (p.reserved_date < WK) { stop = true; break }
       days[p.reserved_date] = (days[p.reserved_date] || 0) + 1;
+      const dc = daysCity[p.reserved_date] || (daysCity[p.reserved_date] = {}); dc[p.location?.name || ''] = (dc[p.location?.name || ''] || 0) + 1;
       if (p.reserved_date < jDate(-6)) continue;
       const k = NORM(p.location?.name) + '|' + NORM(p.zone?.name), o = agg[k] || (agg[k] = { t: 0, w: 0 });
       o.w++; if (p.reserved_date === TODAY) o.t++;
@@ -103,6 +104,7 @@ async function madinty(prev, prevPlots) {
     m2.zones.push({ c: a.location?.name || '', z: a.name, ppm: a.base_price_per_meter_usd, tot: a.total_plots, av: a.available_plots, res: a.reserved_plots, amin: a.area_min, amax: a.area_max, br: a.building_ratio, fl: a.floors_description || '', today: g.t, wk: g.w });
   });
   m2.days = Object.assign(m2.days || {}, days);
+  m2.daysCity = Object.assign({}, Object.fromEntries(Object.entries(m2.daysCity || {}).filter(([d]) => d >= jDate(-20))), daysCity);
   const off = zl.reduce((s, z) => s + (+z.total_plots || 0), 0); if (off) m2.totals.offered = off;
   m2.totals.reserved = stats?.total_reserved_count ?? zl.reduce((s, z) => s + (+z.reserved_plots || 0), 0);
   m2.totals.available = zl.reduce((s, z) => s + (+z.available_plots || 0), 0);
@@ -123,14 +125,24 @@ async function nucaServed() {
   return { servedTo, nextNote };
 }
 
-async function nucaCount() {
+async function nucaCount(maps) {
+  const abs = u => new URL(u, NUCA + '/ar/').href;
   const idOf = a => ((a?.getAttribute('href') || '').match(/ID=(\d+)/) || [])[1];
   const get = async (u, body) => parse(await (await req(NUCA + u, body ? { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } } : {})).text());
   const grid = d => [...d.querySelectorAll('table')].find(t => /القطعة/.test(t.rows[0]?.textContent || ''));
   const rowsOf = t => t ? [...t.rows].slice(1).filter(r => r.cells.length > 5).length : 0;
   const pagerOf = d => { const t = grid(d); return t ? [...t.querySelectorAll('a')].map(a => (a.getAttribute('href') || '').match(/__doPostBack\('([^']+)','Page\$(\d+)'\)/)).filter(Boolean) : [] };
   async function countZone(id) {
-    const url = '/ar/ViewZone.aspx?ID=' + id; let d = await get(url); if (!grid(d)) return 0;
+    const url = '/ar/ViewZone.aspx?ID=' + id; let d = await get(url);
+    try {
+      const m = d.documentElement.innerHTML.match(/TileSource\s*=\s*['"]([^'"]+\.xml)['"]/);
+      const mz = maps.z[id] || (maps.z[id] = {});
+      if (m && (!mz.dzi || !mz.w || mz.src !== m[1])) {
+        const x = await (await req(abs(m[1]))).text(), g = a => (x.match(new RegExp(a + '="([^"]+)"')) || [])[1];
+        Object.assign(mz, { src: m[1], dzi: abs(m[1]).replace(/\.xml$/, '_files/'), w: +g('Width'), h: +g('Height'), ts: +g('TileSize'), ov: +g('Overlap'), f: g('Format') || 'jpg' });
+      }
+    } catch (e) { log('map info failed', id, e.message) }
+    if (!grid(d)) return 0;
     const pl = pagerOf(d); if (!pl.length) return rowsOf(grid(d));
     let n = Math.max(...pl.map(m => +m[2])), target = pl[0][1], last = 1;
     for (let g = 0; g < 40; g++) {
@@ -158,6 +170,11 @@ async function nucaCount() {
       let segs = pr.t.split(' - ').map(s => s.trim()); if (/الحادية عشر/.test(segs[0])) segs.shift();
       if (segs.length > 1 && NORM(segs.at(-1)).includes(key)) segs.pop();
       const dp = await get('/ar/ViewProject.aspx?ID=' + pr.id);
+      try {
+        const main = [...dp.querySelectorAll('img')].map(i => i.getAttribute('src') || '').find(s => /mainproject/i.test(s));
+        maps.p[pr.id] = { img: main ? abs(main) : null };
+        dp.querySelectorAll('.zone-cont').forEach(cn => { const a = cn.querySelector('a[href*="ViewZone"]'), zid = idOf(a), ic = cn.querySelector('img')?.getAttribute('src'); if (zid && ic) (maps.z[zid] ||= {}).icon = abs(ic) });
+      } catch (e) { log('project images failed', pr.id, e.message) }
       for (const a of dp.querySelectorAll('a[href*="ViewZone"]')) {
         const zid = idOf(a), r = (a.closest('.zone-cont')?.textContent || a.textContent).replace(/التفاصيل/g, '').replace(/\s+/g, ' ').trim();
         zones.push({ c, p: segs.join(' - '), r, n: await countZone(zid), zid: +zid, pid: +pr.id });
@@ -187,8 +204,10 @@ async function main() {
   const snaps = await readJson('data/snapshots.json', []);
   let mad = await readJson('data/madinty.json', null);
   let mplots = await readJson('data/mplots.json', []);
-  const watch = await readJson('config/watch.json', []);
-  const picks = await readJson('config/picks.json', []);
+  const mine = await readJson('config/mine.json', {});
+  const watch = mine.watch || await readJson('config/watch.json', []);
+  const picks = (mine.shortlist || []).map(s => ({ zoneId: String(s.id).split('|')[0], plot: String(s.id).split('|').slice(1).join('|'), label: `${s.c} – ${s.z}` })).concat(await readJson('config/picks.json', []));
+  const maps = await readJson('data/maps.json', { z: {}, p: {} }); maps.z ||= {}; maps.p ||= {};
   const errors = [], alerts = [];
   const prevFree = {}; mplots.forEach(d => d.zones.forEach(z => prevFree[z.id] = z.s));
 
@@ -204,7 +223,7 @@ async function main() {
     const last = snaps.at(-1) || {};
     snap = { date: jDate(), ts: jTs(), servedTo: last.servedTo, nextNote: last.nextNote || '', note: '', total: last.total, zts: last.zts || last.ts, zones: last.zones || [] };
     try { Object.assign(snap, await nucaServed()) } catch (e) { errors.push('NUCA serials: ' + (e.message || e)); snap.note += 'Serials not read this run. ' }
-    try { const c = await nucaCount(); snap.zones = c.zones; snap.total = c.total; snap.zts = snap.ts; snap.note += 'Counted from NUCA public plot pages.' }
+    try { const c = await nucaCount(maps); await writeJson('data/maps.json', maps); snap.zones = c.zones; snap.total = c.total; snap.zts = snap.ts; snap.note += 'Counted from NUCA public plot pages.' }
     catch (e) { errors.push('NUCA count: ' + (e.message || e)); snap.note += `Count failed (${String(e.message || e).slice(0, 80)}); zones carried over from ${snap.zts}.` }
     // one snapshot per day: replace today's entry
     if (snaps.length && snaps.at(-1).date === snap.date) snaps[snaps.length - 1] = snap; else snaps.push(snap);
