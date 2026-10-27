@@ -45,7 +45,10 @@ jobs:
           git config user.name "plot-collector"
           git config user.email "plot-collector@users.noreply.github.com"
           git add data
-          git diff --cached --quiet || (git commit -m "madinty $(TZ=Asia/Riyadh date +%Y-%m-%dT%H:%M)" && git pull --rebase && git push)
+          git diff --cached --quiet && exit 0
+          git commit -m "madinty $(TZ=Asia/Riyadh date +%Y-%m-%dT%H:%M)"
+          for i in 1 2 3 4; do git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0; sleep $((i*5)); done
+          exit 1
 
   # NUCA blocks foreign/data-centre addresses, so this job runs on Mohamed's Mac
   # (self-hosted runner). If the Mac is off it waits; only the newest run is kept.
@@ -73,4 +76,7 @@ jobs:
           git config user.name "plot-collector"
           git config user.email "plot-collector@users.noreply.github.com"
           git add data
-          git diff --cached --quiet || (git commit -m "nuca $(TZ=Asia/Riyadh date +%Y-%m-%dT%H:%M)" && git pull --rebase && git push)
+          git diff --cached --quiet && exit 0
+          git commit -m "nuca $(TZ=Asia/Riyadh date +%Y-%m-%dT%H:%M)"
+          for i in 1 2 3 4; do git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0; sleep $((i*5)); done
+          exit 1
