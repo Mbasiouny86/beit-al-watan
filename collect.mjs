@@ -164,7 +164,7 @@ async function nucaCount(maps) {
   const zones = [];
   for (const [cid, c] of cities) {
     const dc = await get('/ar/ViewCity.aspx?ID=' + cid);
-    const projs = [...dc.querySelectorAll('.prj')].map(p => ({ id: idOf(p.querySelector('a[href*="ViewProject"]')), t: (p.querySelector('span')?.textContent || '').trim() })).filter(p => p.id && /الحادية عشر/.test(p.t));
+    const projs = [...dc.querySelectorAll('.prj')].map(p => ({ id: idOf(p.querySelector('a[href*="ViewProject"]')), t: (p.querySelector('span')?.textContent || '').trim(), open: !/ball_red/i.test(p.querySelector('img[id$="imgState"]')?.getAttribute('src') || '') })).filter(p => p.id && /الحادية عشر/.test(p.t) && p.open);
     const key = NORM(c.replace(/^ال/, '').split(' ')[0]).replace(/^ال/, '');
     for (const pr of projs) {
       let segs = pr.t.split(' - ').map(s => s.trim()); if (/الحادية عشر/.test(segs[0])) segs.shift();
