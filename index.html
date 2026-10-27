@@ -717,9 +717,11 @@ function syncBox(){const on=!!ghTok;const st=sy.state==='saving'?t('sy_saving'):
   <a class="small" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">${t('sy_help')} ↗</a></div></details>`}</section>`}
 function renderSyncState(){const e=$('syState');if(!e)return;e.textContent=sy.state==='saving'?t('sy_saving'):sy.state==='err'?t('sy_err'):sy.at?t('sy_ok')+' '+sy.at.toLocaleTimeString(LANG==='ar'?'ar-EG-u-nu-latn':'en-GB',{hour:'2-digit',minute:'2-digit'}):''}
 async function connectSync(){const v=($('syTok')?.value||'').trim();if(!v)return;
-  try{const r=await fetch('https://api.github.com/repos/Mbasiouny86/beit-al-watan',{headers:{Authorization:'Bearer '+v,Accept:'application/vnd.github+json'}});const j=await r.json();if(!r.ok||!j.permissions?.push)throw new Error('bad')}
-  catch(e){toast(t('sy_bad'));return}
-  ghTok=v;try{localStorage.setItem('bw_gh_tok',v)}catch(e){}localDirty=true;await pullAndApply();if(!localDirty)toast(t('sy_done'));else{await pushMine();toast(t('sy_done'))}render()}
+  const vv=v.replace(/\s+/g,'');
+  try{const r=await fetch(GHAPI+'?ref=main',{headers:{Authorization:'Bearer '+vv,Accept:'application/vnd.github+json'},cache:'no-store'});if(!(r.ok||r.status===404))throw new Error('HTTP '+r.status)}
+  catch(e){toast(t('sy_bad')+' ('+(e.message||e)+')');return}
+  const v2=vv;
+  ghTok=v2;try{localStorage.setItem('bw_gh_tok',v2)}catch(e){}localDirty=true;await pullAndApply();if(localDirty)await pushMine();toast(sy.state==='err'?t('sy_err')+' ('+sy.err+')':t('sy_done'));render()}
 // ---------- boot ----------
 try{const S=JSON.parse($('seed').textContent);snaps=S.snapshots||[];mad=S.madinty||null;research=S.research||null;MP=parsePlots(S.mplots||[])}catch(e){}
 shortlist=loadLocal();try{watch=JSON.parse(localStorage.getItem('bw_watch')||'[]')}catch(e){watch=[]}
