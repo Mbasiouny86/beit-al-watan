@@ -323,14 +323,14 @@ function renderTop(){
   document.documentElement.lang=LANG;document.documentElement.dir=LANG==='ar'?'rtl':'ltr';
   document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));
   $('lang-en').setAttribute('aria-pressed',LANG==='en');$('lang-ar').setAttribute('aria-pressed',LANG==='ar');
-  const nfree=(cur()?.zones||[]).reduce((a,z)=>a+z.n,0);const zt=cur()?.zts||cur()?.ts||'';const nuFresh=!!(nfree&&zt&&Date.now()-Date.parse(zt.slice(0,16)+':00+03:00')<=24*3600e3);const free=(nuFresh||!mad)?nfree:mad.totals.available;const src=nuFresh?(LANG==='ar'?'المصدر: الهيئة':'Source: NUCA'):(LANG==='ar'?'المصدر: مدينتي (فحص الهيئة أقدم من 24 ساعة)':'Source: Madinty (NUCA check older than 24h)');
+  const nfree=(cur()?.zones||[]).reduce((a,z)=>a+z.n,0);const zt=cur()?.zts||cur()?.ts||'';const nuFresh=!!(nfree&&zt&&Date.now()-Date.parse(zt.slice(0,16)+':00+03:00')<=24*3600e3);const madNewer=mad&&(mad.ts||'')>(zt||'').slice(0,16);const free=(nuFresh&&!madNewer)||!mad?nfree:mad.totals.available;const src=(nuFresh&&!madNewer)?(LANG==='ar'?'المصدر: الهيئة':'Source: NUCA'):(LANG==='ar'?'المصدر: مدينتي (أحدث من فحص الهيئة '+(zt||'').slice(11,16)+')':'Source: Madinty (newer than NUCA check '+(zt||'').slice(11,16)+')');
   const R=recent(),A=ahead(),days=Math.ceil(A/PER_DAY),eta=addBookingDays(servedEstDate||cur()?.date||'2026-10-25',days);
   const will=R?A*R.rate:null,left=R?Math.max(0,free-will):null;
   const d=Math.abs(nfree-free),ok=d<=Math.max(10,free*0.005);
   const K=[['free','k_free',fmt(free),`${t('k_free_d')} · ${esc(src)} · <span class="pill ${ok?'ok':'low'}">${ok?t('match'):t('differs')+' '+fmt(d)}</span>`,''],
     ['booked','k_booked',fmt(mad?.totals.reserved),`<b>${mad?pct(mad.totals.reserved/Math.max(1,served())):''}</b> ${T[LANG].k_booked_of(fmt(served()))}`,'bk'],
     (()=>{const s=lastSession();const top=s.top;const tl=top.slice(0,2).map(([c,v])=>cname(c)+' '+v).join(' · ');return['today',s.isToday?'k_today':'k_last',fmt(s.n),`${s.isToday?t('k_today_d'):esc(dayLabel(s.day))+' · '+t('k_sess_d')} (${pct(s.n/PER_DAY)})${tl?'<br>'+t('k_today_top')+' '+esc(tl):''}`,'bk']})(),
-    ['called','k_called',(servedEst!=null&&servedEst!==cur()?.servedTo?'≈':'')+fmt(served()),`${t('k_called_d')} · ${fmt(A)} ${LANG==='ar'?'قبلك':'ahead'}`,''],
+    ['called','k_called',(servedEst!=null&&servedEst!==cur()?.servedTo?'≈':'')+fmt(served()),`${t('k_called_d')} · ${fmt(A)} ${LANG==='ar'?'قبلك':'ahead'}${sessTxt()}`,''],
     ['turn','k_turn',eta.toLocaleDateString(LANG==='ar'?'ar-EG-u-nu-latn':'en-GB',{month:'short',year:'numeric'}),t('k_turn_d'),''],
     ['left','k_left',left==null?'—':'~'+fmt(left),t('k_left_d'),'']];
   $('kpis').innerHTML=K.map(([ic,k,v,d,cls])=>`<div class="kpi ${cls}"><span class="ic">${svg(ic)}</span><span class="t">${t(k)}</span><span class="v">${v}</span><span class="d">${d}</span></div>`).join('');
@@ -623,16 +623,19 @@ function renderLive(){const b=$('liveBar');if(!b)return;b.hidden=false;
   const ts=s=>{if(!s)return'';const d=s.slice(0,10),h=s.slice(11,16);return (d===jDate()?'':dayLabel(d)+' ')+h};
   const madTxt=live?.busy&&!live.phase?t('st_upd'):live?.err?t('st_err')+' '+ts(mad?.ts||''):live?.at?t('st_live')+' · '+tm(live.at)+(live.busy?' · '+t('st_upd'):''):ts(mad?.ts||'');
   const s=cur()||{};const nz=ts(s.zts||s.ts||'');
-  const nx=nextSession();
+  const sn=sessionNow();const nx=sn?null:nextSession();
   b.className='livebar'+(live?.busy?' busy':live?.err?' err':'');
-  b.innerHTML=`<span class="dot"></span><span><b>${t('st_mad')}</b> ${esc(madTxt)}</span><span><b>${t('st_nuca')}</b> ${t('st_serials')} <span class="num">${fmt(s.servedTo)}</span> · ${t('st_checked')} ${esc(nz)}</span>${nx?`<span><b>${t('st_next')}</b> ${esc(nx)}</span>`:''}<button class="btn" id="liveBtn" ${live?.busy?'disabled':''}>↻ ${ar?'تحديث':'Refresh'}</button>`}
+  b.innerHTML=`<span class="dot"></span><span><b>${t('st_mad')}</b> ${esc(madTxt)}</span><span><b>${t('st_nuca')}</b> ${t('st_serials')} <span class="num">${fmt(s.servedTo)}</span> · ${t('st_checked')} ${esc(nz)}</span>${sn?`<span class="pill low">${LANG==='ar'?'الجلسة جارية الآن':'Session in progress'}: <span class="num">${fmt(sn.from)}–${fmt(sn.to)}</span> · ${LANG==='ar'?'منذ 11:00':'since 11:00'} · ${LANG==='ar'?'محجوز اليوم':'booked today'} <span class="num">${fmt(mad?.days?.[jDate()]||0)}</span></span>`:''}${nx?`<span><b>${t('st_next')}</b> ${esc(nx)}</span>`:''}<button class="btn" id="liveBtn" ${live?.busy?'disabled':''}>↻ ${ar?'تحديث':'Refresh'}</button>`}
+function sessionNow(){const s=cur();if(!s)return null;const jd=jNow(),today=jDate();const n=String(s.nextNote||'');let m=n.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);const d=m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:null;
+  const bday=jd.getUTCDay()<=4,after11=jd.getUTCHours()>=11;if(after11&&bday&&(d===today||(!d&&(s.date||'')<today))){return{from:s.servedTo+1,to:s.servedTo+PER_DAY}}return null}
+function sessTxt(){const s=sessionNow();return s?` · ${LANG==='ar'?'الآن':'now'} ${fmt(s.from)}–${fmt(s.to)}`:''}
 function nextSession(){const s=cur();if(!s)return'';const n=String(s.nextNote||'');let m=n.match(/(\d{1,2})\/(\d{1,2})\/(\d{4}).*?(\d[\d,]*)\D+(\d[\d,]*)\s*$/);
   if(!m)m=n.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[\s\S]*?مسلسل\s*(\d+)\s*حتى\s*مسلسل\s*(\d+)/);
   if(m){const d=`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;return `${dayLabel(d)} 11:00 · ${fmt(+m[4].replace(/,/g,''))}–${fmt(+m[5].replace(/,/g,''))}`}
   const a=s.servedTo;return a?`${fmt(a+1)}–${fmt(a+PER_DAY)}`:''}
 function dayLabel(d){if(!d)return'';return new Date(d+'T12:00:00Z').toLocaleDateString(LANG==='ar'?'ar-EG-u-nu-latn':'en-GB',{weekday:'short',day:'numeric',month:'short'})}
 function lastSession(){const today=jDate();const days=Object.entries(mad?.days||{}).filter(([d,n])=>n>=20).sort((a,b)=>a[0].localeCompare(b[0]));
-  const isToday=(mad?.days?.[today]||0)>=20;const day=isToday?today:(days.at(-1)?.[0]||today);const n=mad?.days?.[day]||0;
+  const jd=jNow(),bday=jd.getUTCDay()<=4,after11=jd.getUTCHours()>=11;const isToday=(mad?.days?.[today]||0)>=20||(bday&&after11&&(mad?.days?.[today]||0)>0)||(bday&&after11&&mad?.date===today);const day=isToday?today:(days.at(-1)?.[0]||today);const n=mad?.days?.[day]||0;
   let top=[];const dc=mad?.daysCity?.[day];if(dc)top=Object.entries(dc).sort((a,b)=>b[1]-a[1]);else if(day===mad?.date){const m={};(mad?.zones||[]).forEach(z=>{if(z.today)m[z.c]=(m[z.c]||0)+z.today});top=Object.entries(m).sort((a,b)=>b[1]-a[1])}
   return{isToday,day,n,top}}
 document.addEventListener('click',e=>{if(e.target.closest('#liveBtn'))liveRefresh()});
@@ -642,10 +645,10 @@ function liveInit(){live={busy:false,at:null,err:null};liveRefresh();
 // ---------- home (simple mode) ----------
 function renderHome(){
   const nfree=(cur()?.zones||[]).reduce((a,z)=>a+z.n,0);const zt=cur()?.zts||cur()?.ts||'';const nuFresh=!!(nfree&&zt&&Date.now()-Date.parse(zt.slice(0,16)+':00+03:00')<=24*3600e3);
-  const free=(nuFresh||!mad)?nfree:mad.totals.available;const R=recent(),A=ahead(),eta=addBookingDays(servedEstDate||cur()?.date||jDate(),Math.ceil(A/PER_DAY));
+  const madNewer=mad&&(mad.ts||'')>(zt||'').slice(0,16);const free=(nuFresh&&!madNewer)||!mad?nfree:mad.totals.available;const R=recent(),A=ahead(),eta=addBookingDays(servedEstDate||cur()?.date||jDate(),Math.ceil(A/PER_DAY));
   const left=R?Math.max(0,free-A*R.rate):null;const s=lastSession();const booked=mad?.totals.reserved;
   const mini=[['free',t('k_free'),fmt(free),''],['booked',t('k_booked'),fmt(booked),`${mad?pct(booked/Math.max(1,served())):''} ${LANG==='ar'?'من '+fmt(served())+' مسلسل':'of '+fmt(served())+' serials'}`],
-    ['today',s.isToday?t('k_today'):t('k_last'),fmt(s.n),s.isToday?'':dayLabel(s.day)],['called',t('k_called'),fmt(served()),`${fmt(A)} ${LANG==='ar'?'قبلك':'ahead of you'}`],
+    ['today',s.isToday?t('k_today'):t('k_last'),fmt(s.n),s.isToday?'':dayLabel(s.day)],['called',t('k_called'),fmt(served()),`${fmt(A)} ${LANG==='ar'?'قبلك':'ahead of you'}${sessTxt()}`],
     ['turn',t('k_turn'),eta.toLocaleDateString(LANG==='ar'?'ar-EG-u-nu-latn':'en-GB',{day:'numeric',month:'short',year:'numeric'}),''],['left',t('k_left'),left==null?'—':'~'+fmt(left),'']];
   const nGone=shortlist.filter(x=>!findPlot(x.id)).length,wAlert=watchRows().filter(w=>w.alert).length;
   const tiles=[['summary','summary',T[LANG].tabs.summary],['booked','bookedT',T[LANG].tabs.booked],['cities','cities',T[LANG].tabs.cities],['plots','plots',T[LANG].tabs.plots],
