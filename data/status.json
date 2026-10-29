@@ -1,1 +1,1 @@
-{"ts":"2026-10-29T12:05","served":7200,"rate":0.48333333333333334,"free":11188,"freeAtTurn":1747,"turnDate":"2027-01-31","todayN":0,"weekN":748,"nucaFresh":false,"errors":["Madinty: fetch failed / ETIMEDOUT"],"alerts":[],"diffs":[]}
+{"ts":"2026-10-29T12:07","served":7500,"rate":0.48333333333333334,"free":11188,"freeAtTurn":1892,"turnDate":"2027-01-28","todayN":0,"weekN":748,"nucaFresh":true,"nucaTotal":11178,"errors":[],"alerts":[],"diffs":[]}
