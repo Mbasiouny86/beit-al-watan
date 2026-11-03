@@ -1,1 +1,1 @@
-{"ts":"2026-11-03T16:21","served":8400,"rate":0.49166666666666664,"free":10637,"freeAtTurn":1623,"turnDate":"2027-01-28","todayN":67,"weekN":703,"nucaFresh":false,"errors":["Madinty: HTTP 429 https://madinty.test-domain-devunity.com/api/v1/land-zones/8/plots?per_page=5000"],"alerts":[],"diffs":[]}
+{"ts":"2026-11-03T16:23","served":8400,"rate":0.49166666666666664,"free":10637,"freeAtTurn":1623,"turnDate":"2027-01-28","todayN":67,"weekN":703,"nucaFresh":true,"nucaTotal":10609,"errors":[],"alerts":[],"diffs":[]}
